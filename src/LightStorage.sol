@@ -1,7 +1,17 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.26;
+
+enum KeyStatus {
+    Empty,
+    HashOnly,
+    Loaded
+}
 
 library LightStorage {
+    error DataMismatchHash(bytes32 dataHash, bytes32 persistentHash);
+    error DataNotLoaded(bytes32 persistentHash);
+    error UnknownKey(bytes32 compatibleHash);
+
     function _writeS(bytes32 key, bytes32 value) private {
         assembly {
             sstore(key, value)
@@ -20,11 +30,13 @@ library LightStorage {
         unchecked {
             uint256 fullSlots = 0x01 + data.length / 0x20;
             lastKey = bytes32(uint256(key) + fullSlots);
-            lastShift = 0x08 * (0x20 - data.length % 0x20);
+            lastShift = 0x08 * (0x20 - (data.length % 0x20));
         }
 
         assembly {
-            for {} iszero(eq(key, lastKey)) {
+            for {
+
+            } iszero(eq(key, lastKey)) {
                 data := add(data, 0x20)
                 key := add(key, 0x01)
             } {
@@ -51,11 +63,13 @@ library LightStorage {
         unchecked {
             uint256 fullSlots = length / 0x20;
             lastKey = bytes32(uint256(key) + fullSlots);
-            lastShift = 0x08 * (0x20 - length % 0x20);
+            lastShift = 0x08 * (0x20 - (length % 0x20));
         }
         assembly {
             let i := 0x20
-            for {} iszero(eq(key, lastKey)) {
+            for {
+
+            } iszero(eq(key, lastKey)) {
                 i := add(i, 0x20)
                 key := add(key, 0x01)
             } {
@@ -65,24 +79,38 @@ library LightStorage {
         }
     }
 
-    /// @dev set `data` to transient storage under `compatibleKey` validating `hash(data)` matches persistent hash in storage under `compatibleKey`
-    function load(bytes32 compatibleKey, bytes memory data) internal {
-        bytes32 dataHash = keccak256(data);
+    function status(bytes32 compatibleKey) internal view returns (KeyStatus) {
         bytes32 persistentHash = _readS(compatibleKey);
-        require(persistentHash == dataHash);
+        if (persistentHash == 0) return KeyStatus.Empty;
+
+        bytes memory data = _readT(compatibleKey);
+
+        bytes32 dataHash = keccak256(data);
+        if (persistentHash == dataHash) return KeyStatus.Loaded;
+
+        return KeyStatus.HashOnly;
+    }
+
+    function load(bytes32 compatibleKey, bytes memory data) internal {
+        bytes32 persistentHash = _readS(compatibleKey);
+        require(persistentHash != 0, UnknownKey(compatibleKey));
+
+        bytes32 dataHash = keccak256(data);
+        require(persistentHash == dataHash, DataMismatchHash(dataHash, persistentHash));
 
         _writeT(compatibleKey, data);
     }
 
     function read(bytes32 compatibleKey) internal view returns (bytes memory data) {
+        bytes32 persistentHash = _readS(compatibleKey);
+        require(persistentHash != 0, UnknownKey(compatibleKey));
+
         data = _readT(compatibleKey);
 
         bytes32 dataHash = keccak256(data);
-        bytes32 persistentHash = _readS(compatibleKey);
-        require(persistentHash == dataHash);
+        require(persistentHash == dataHash, DataNotLoaded(persistentHash));
     }
 
-    /// @dev update transient storage and persistent hash
     function write(bytes32 compatibleKey, bytes memory data) internal {
         bytes32 dataHash = keccak256(data);
 
