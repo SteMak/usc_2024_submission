@@ -1,12 +1,14 @@
-# Underhanded Solidity Contest Submission
+# Underhanded Solidity Contest 2024 Submission
 
 ## Idea
 
-The implementation of `transient` storage enables an efficient ability to create lightweight smart contracts. Lightweight means that only a data hash is stored in `persistent` storage, while any data needed by transactions is attached additionally. The `transient` storage is accessible from different execution contexts, which allows the division of responsibility between preloading data and requests execution. Additionally, this provides significant optimization opportunities, as data can be loaded once by a batch transaction.
+The implementation of `transient` storage enables an efficient ability to create lightweight smart contracts. Lightweight means that only a data hash is stored in `persistent` storage, while any data needed by transactions is attached additionally. The `transient` storage is accessible from different execution contexts, which allows the division of responsibility between preloading data and requests execution. Additionally, this provides significant optimization opportunities, as data can be loaded once by a batch transaction, and possibly can be integrated with transaction access lists in the far future.
 
 ### Composability
 
 The idea involves `transient` storage being retained after the execution context ends, which may potentially cause composability issues. To address this, the implementation __MUST__ process any __sequence of calls that succeed in isolated execution__ in the same way, regardless of whether the calls are executed in isolation or not. This ensures backward compatibility and enables the contract to provide __additional__ functionality based on `transient` storage utilization.
+
+To satisfy this condition, it is enough to ensure any succesfull isolated call executes `tstore(key, ...)` prior to `tload(key)`. As each accessed data slot is rewritten before the read, any data in `transient` storage does not impact the execution. Thus, the call can be safely composed with other ones.
 
 ## Submission
 
@@ -22,6 +24,12 @@ More details on how the `LightStorage` library works:
 - `load(bytes32 compatibleKey, bytes memory data)` stores the `data` at `compatibleKey` (and subsequent slots) in `transient` storage. It aborts if no `data hash` is recorded in `persistent` storage or if the provided data does not match the recorded `data hash`.
 - `read(bytes32 compatibleKey) returns (bytes memory data)` returns the `data` stored at `compatibleKey` (and subsequent slots) in `transient` storage. It aborts if the data is not loaded into `transient` storage, if no `data hash` is recorded in `persistent` storage, or if the data in `transient` storage is corrupted and does not match the recorded `data hash`.
 - `status(bytes32 compatibleKey) returns (KeyStatus)` returns whether the key is empty, if data is loaded into `transient` storage, or if it is not loaded (including cases of data corruption).
+
+### Composability
+
+In the context of an isolated call, the `read` function may succeed without prior `transient` data set only for reading zero length bytes array. Otherwise, the execution fails due to the recorded hash mismatch. Zero length arrays are not used in the project.
+
+Additionally, that the `status` function does not follow the composability requirement. However, in context of the project it is not used that way.
 
 ### Data Packing
 
@@ -55,7 +63,7 @@ The integration contract provides wrappers over the `LightStorage` library to re
 
 ## Light Vesting
 
-The target contract implements linear vesting functionality with a cliff. Anyone can create a vesting, and the admin can slightly modify the overall configuration.
+The target contract implements linear vesting functionality with a cliff. Anyone can create a vesting, and the admin can slightly modify the vesting creation rules.
 
 Configuration is stored at specified `CONFIG_KEY` slot.
 
@@ -65,4 +73,4 @@ Vestings are stored at `keccak256(VESTING_KEY, beneficiary, creator, nonce))` sl
 
 Smart contracts can preload data into `transient` storage using the `loadConfig` and `loadVesting` functions.
 
-EOA actors can use overloaded functions that accept `Config` and `Vesting` structures as additional parameters.
+EOA actors are provided with overloaded functions that accept `Config` and `Vesting` structures as additional parameters.

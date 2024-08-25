@@ -7,6 +7,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./LightStorage.sol";
 
 /// @notice Vesting contract configuration
+/// @dev This configuration should prevent integer overflow possibility
+///   in the `_calcTotalVested` and `create` functions
 struct Config {
     address admin;
     uint256 maxAmount;
@@ -17,6 +19,7 @@ struct Config {
 }
 
 /// @notice Vesting schedule parameters
+/// @dev Here cliff is duration part, not a direct timestamp
 struct Vesting {
     address user;
     uint256 amount;
@@ -28,46 +31,47 @@ struct Vesting {
 
 /// @title LightStorageIntegration Contract
 /// @notice Abstract contract that integrates `LightStorage` operations with Config and Vesting data structures
+/// @dev The contract contains rug pull ability
 abstract contract LightStorageIntegration {
     using LightStorage for bytes32;
 
     bytes32 public constant CONFIG_KEY = bytes32(uint256(keccak256("compatibleKey.vesting.config")) - 1);
     bytes32 public constant VESTING_KEY = bytes32(uint256(keccak256("compatibleKey.vesting.vestingPrefix")) - 1);
 
-    /// @notice Checks the status of combined storage at the key
+    /// @notice Check the status of combined storage at the key
     /// @return The status of the combined storage (Empty, HashOnly, or Loaded)
     function keyStatus(bytes32 key) public view returns (KeyStatus) {
         return key.status();
     }
 
-    /// @notice Loads the Config struct data into `transient` storage
+    /// @notice Preload the Config struct data into combined storage
     function loadConfig(bytes32 key, Config memory config) public {
         key.load(abi.encode(config));
     }
 
-    /// @notice Loads the Vesting struct data into `transient` storage
+    /// @notice Preload the Vesting struct data into combined storage
     function loadVesting(bytes32 key, Vesting memory vesting) public {
         key.load(abi.encode(vesting));
     }
 
-    /// @notice Retrieves the Config struct from `transient` storage at the key
+    /// @notice Retrieve the Config struct from combined storage at the key
     /// @return The Config struct
     function getConfig(bytes32 key) public view returns (Config memory) {
         return abi.decode(key.read(), (Config));
     }
 
-    /// @notice Retrieves the Vesting struct from `transient` storage at the key
+    /// @notice Retrieve the Vesting struct from combined storage at the key
     /// @return The Vesting struct
     function getVesting(bytes32 key) public view returns (Vesting memory) {
         return abi.decode(key.read(), (Vesting));
     }
 
-    /// @notice Writes the Config struct to both `persistent` and `transient` storage
+    /// @dev Writes the Config struct to combined storage
     function _setConfig(bytes32 key, Config memory config) internal {
         key.write(abi.encode(config));
     }
 
-    /// @notice Writes the Vesting struct to both `persistent` and `transient` storage
+    /// @dev Writes the Vesting struct to combined storage
     function _setVesting(bytes32 key, Vesting memory vesting) internal {
         key.write(abi.encode(vesting));
     }
@@ -111,7 +115,7 @@ contract LightVesting is LightStorageIntegration {
         emit Configuration(config, true);
     }
 
-    /// @notice Updates the vesting creation rules
+    /// @notice Update the vesting creation rules
     function configurate(Config memory updated) public {
         Config memory config = getConfig(CONFIG_KEY);
 
@@ -131,8 +135,8 @@ contract LightVesting is LightStorageIntegration {
         configurate(updated);
     }
 
-    /// @notice Creates a new vesting schedule
-    /// @return key The key associated with the newly created vesting schedule
+    /// @notice Create a new vesting schedule
+    /// @return key The key associated with the newly created vesting
     function create(
         address beneficiary,
         uint256 nonce,
@@ -146,12 +150,15 @@ contract LightVesting is LightStorageIntegration {
 
         Config memory config = getConfig(CONFIG_KEY);
 
-        uint256 maxStart = block.timestamp + START_GAP;
-        require(maxStart >= start, StartOverMax(start, maxStart));
-        uint256 maxCliff = (duration * config.maxCliffPercent) / DENOM;
-        require(maxCliff >= cliff, CliffOverMax(cliff, maxCliff));
         require(config.maxAmount >= amount, AmountOverMax(amount, config.maxAmount));
         require(config.maxDuration >= duration, DurationOverMax(duration, config.maxDuration));
+
+        uint256 maxStart = block.timestamp + START_GAP;
+        require(maxStart >= start, StartOverMax(start, maxStart));
+
+        /// @dev In case of misconfiguration `duration * config.maxCliffPercent` may overflow
+        uint256 maxCliff = (duration * config.maxCliffPercent) / DENOM;
+        require(maxCliff >= cliff, CliffOverMax(cliff, maxCliff));
 
         config.token.safeTransferFrom(msg.sender, address(this), amount);
 
@@ -175,29 +182,31 @@ contract LightVesting is LightStorageIntegration {
         return create(beneficiary, nonce, amount, start, duration, cliff);
     }
 
-    /// @notice Calculates the total amount of tokens vested based on the current time
+    /// @dev Calculates the total amount of tokens vested based on the current time
     function _calcTotalVested(
         uint256 start,
         uint256 cliff,
         uint256 duration,
         uint256 amount
     ) internal view returns (uint256) {
+        /// @dev In case of misconfiguration `start + duration` may overflow
         if (block.timestamp >= start + duration) {
             return amount;
         } else if (block.timestamp < start + cliff) {
             return 0;
         } else {
+            /// @dev In case of misconfiguration `amount * timePassed` may overflow
             return (amount * (block.timestamp - start)) / duration;
         }
     }
 
-    /// @notice Calculates the amount of tokens that can be withdrawn at the moment
+    /// @dev Calculates the amount of tokens that can be withdrawn at the moment
     function _calcWithdrawable(Vesting memory vesting) internal view returns (uint256) {
         uint256 vestedAmount = _calcTotalVested(vesting.start, vesting.cliff, vesting.duration, vesting.amount);
         return vestedAmount - vesting.claimed;
     }
 
-    /// @notice Returns the amount of tokens that can be withdrawn by the beneficiary at the moment
+    /// @notice Retrieve the amount of tokens that can be withdrawn by the beneficiary at the moment
     /// @return The amount of tokens that can be withdrawn
     function withdrawable(bytes32 key) public view returns (uint256) {
         return _calcWithdrawable(getVesting(key));
@@ -209,7 +218,7 @@ contract LightVesting is LightStorageIntegration {
         return withdrawable(key);
     }
 
-    /// @notice Allows the beneficiary to withdraw vested tokens
+    /// @notice Allow the beneficiary to withdraw vested tokens
     function withdraw(bytes32 key) public {
         Vesting memory vesting = getVesting(key);
         require(vesting.user == msg.sender, NotBeneficiary(msg.sender, vesting.user));
