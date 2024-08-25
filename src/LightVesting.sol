@@ -63,7 +63,8 @@ contract LightVesting is LightStorageIntegration {
     using SafeERC20 for IERC20;
 
     uint256 public constant DENOM = 100000; // 100%
-    uint32 public constant MAX_FEE = 1000; // 1%
+    uint256 public constant MAX_FEE = 1000; // 1%
+    uint256 public constant START_GAP = 50 * 52 weeks; // 50 years
 
     error NotAdmin(address caller, address admin);
 
@@ -74,6 +75,7 @@ contract LightVesting is LightStorageIntegration {
     error CliffOverMax(uint256 cliff, uint256 max);
     error AmountOverMax(uint256 amount, uint256 max);
     error DurationOverMax(uint256 duration, uint256 max);
+    error StartOverMax(uint256 start, uint256 max);
 
     error VestingAlreadyExist(bytes32 key);
     error NotBeneficiary(address caller, address beneficiary);
@@ -114,15 +116,17 @@ contract LightVesting is LightStorageIntegration {
         address beneficiary,
         uint256 nonce,
         uint256 amount,
-        uint32 start,
-        uint32 duration,
-        uint32 cliff
+        uint256 start,
+        uint256 duration,
+        uint256 cliff
     ) public returns (bytes32 key) {
         key = keccak256(abi.encode(VESTING_KEY, beneficiary, msg.sender, nonce));
         require((keyStatus(key) == KeyStatus.Empty), VestingAlreadyExist(key));
 
         Config memory config = getConfig(CONFIG_KEY);
 
+        uint256 maxStart = block.timestamp + START_GAP;
+        require(maxStart >= start, StartOverMax(start, maxStart));
         uint256 maxCliff = (duration * config.maxCliffPercent) / DENOM;
         require(maxCliff >= cliff, CliffOverMax(cliff, maxCliff));
         require(config.maxAmount >= amount, AmountOverMax(amount, config.maxAmount));
@@ -140,9 +144,9 @@ contract LightVesting is LightStorageIntegration {
         address beneficiary,
         uint256 nonce,
         uint256 amount,
-        uint32 start,
-        uint32 duration,
-        uint32 cliff,
+        uint256 start,
+        uint256 duration,
+        uint256 cliff,
         Config memory config
     ) external returns (bytes32 key) {
         loadConfig(CONFIG_KEY, config);
