@@ -10,7 +10,9 @@ enum KeyStatus {
 library LightStorage {
     error DataMismatchHash(bytes32 dataHash, bytes32 persistentHash);
     error DataNotLoaded(bytes32 persistentHash);
-    error UnknownKey(bytes32 compatibleHash);
+    error UnknownKey(bytes32 compatibleKey);
+
+    event Write(bytes32 indexed compatibleKey, bytes data);
 
     function _writeS(bytes32 key, bytes32 value) private {
         assembly {
@@ -116,5 +118,7 @@ library LightStorage {
 
         _writeS(compatibleKey, dataHash);
         _writeT(compatibleKey, data);
+
+        emit Write(compatibleKey, data);
     }
 }
