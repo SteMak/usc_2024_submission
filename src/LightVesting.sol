@@ -101,7 +101,7 @@ contract LightVesting is LightStorageIntegration {
     error NotBeneficiary(address caller, address beneficiary);
 
     event Configuration(Config config, bool adminChanged);
-    event VestingCreate(bytes32 indexed key, Vesting vesting, uint256 nonce);
+    event VestingCreate(bytes32 indexed key, Vesting vesting, uint256 fee);
     event VestingClaim(bytes32 indexed key, Vesting vesting, uint256 unlocked);
 
     /// @notice Constructor to initialize the contract with a Config struct
@@ -160,12 +160,15 @@ contract LightVesting is LightStorageIntegration {
         uint256 maxCliff = (duration * config.maxCliffPercent) / DENOM;
         require(maxCliff >= cliff, CliffOverMax(cliff, maxCliff));
 
-        config.token.safeTransferFrom(msg.sender, address(this), amount);
+        uint256 fee = (amount * config.fee) / DENOM;
 
-        Vesting memory vesting = Vesting(beneficiary, amount, 0, start, duration, cliff);
+        Vesting memory vesting = Vesting(beneficiary, amount - fee, 0, start, duration, cliff);
         _setVesting(key, vesting);
 
-        emit VestingCreate(key, vesting, nonce);
+        config.token.safeTransferFrom(msg.sender, address(this), amount);
+        config.token.safeTransfer(config.admin, fee);
+
+        emit VestingCreate(key, vesting, fee);
     }
 
     /// @notice EOA `create` function endpoint
