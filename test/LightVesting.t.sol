@@ -75,13 +75,13 @@ contract VestingTest is Test {
 
     function test_basicFlow() public {
         uint256 amount = 100000000;
-        token.mint(address(this), amount);
-        token.approve(address(vesting), amount);
+        token.mint(address(this), type(uint).max);
+        token.approve(address(vesting), type(uint).max);
 
         bytes32 key = vesting.create(
             userA,
             17,
-            amount,
+            (amount * 100000) / 99900,
             block.timestamp,
             1000,
             500,
@@ -134,7 +134,7 @@ contract VestingTest is Test {
         }
         vm.stopPrank();
 
-        vesting.configurate(Config(address(this), amount * 100, 0, 0, 0, IERC20(address(token))));
+        vesting.configurate(Config(address(this), (amount * 100 * 999) / 1000, 0, 0, 0, IERC20(address(token))));
         vesting.withdraw(vesting.CONFIG_KEY());
 
         assertEq(token.balanceOf(address(this)), amount * 100);
