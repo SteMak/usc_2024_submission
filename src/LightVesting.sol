@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./LightStorage.sol";
 
+/// @notice Vesting contract configuration
 struct Config {
     address admin;
     uint256 maxAmount;
@@ -15,6 +16,7 @@ struct Config {
     IERC20 token;
 }
 
+/// @notice Vesting schedule parameters
 struct Vesting {
     address user;
     uint256 amount;
@@ -24,41 +26,55 @@ struct Vesting {
     uint256 cliff;
 }
 
+/// @title LightStorageIntegration Contract
+/// @notice Abstract contract that integrates `LightStorage` operations with Config and Vesting data structures
 abstract contract LightStorageIntegration {
     using LightStorage for bytes32;
 
     bytes32 public constant CONFIG_KEY = bytes32(uint256(keccak256("compatibleKey.vesting.config")) - 1);
     bytes32 public constant VESTING_KEY = bytes32(uint256(keccak256("compatibleKey.vesting.vestingPrefix")) - 1);
 
+    /// @notice Checks the status of combined storage at the key
+    /// @return The status of the combined storage (Empty, HashOnly, or Loaded)
     function keyStatus(bytes32 key) public view returns (KeyStatus) {
         return key.status();
     }
 
+    /// @notice Loads the Config struct data into `transient` storage
     function loadConfig(bytes32 key, Config memory config) public {
         key.load(abi.encode(config));
     }
 
+    /// @notice Loads the Vesting struct data into `transient` storage
     function loadVesting(bytes32 key, Vesting memory vesting) public {
         key.load(abi.encode(vesting));
     }
 
+    /// @notice Retrieves the Config struct from `transient` storage at the key
+    /// @return The Config struct
     function getConfig(bytes32 key) public view returns (Config memory) {
         return abi.decode(key.read(), (Config));
     }
 
+    /// @notice Retrieves the Vesting struct from `transient` storage at the key
+    /// @return The Vesting struct
     function getVesting(bytes32 key) public view returns (Vesting memory) {
         return abi.decode(key.read(), (Vesting));
     }
 
+    /// @notice Writes the Config struct to both `persistent` and `transient` storage
     function _setConfig(bytes32 key, Config memory config) internal {
         key.write(abi.encode(config));
     }
 
+    /// @notice Writes the Vesting struct to both `persistent` and `transient` storage
     function _setVesting(bytes32 key, Vesting memory vesting) internal {
         key.write(abi.encode(vesting));
     }
 }
 
+/// @title LightVesting Contract
+/// @notice Contract for creating and withdrawing token vesting schedules
 contract LightVesting is LightStorageIntegration {
     using SafeERC20 for IERC20;
 
@@ -84,6 +100,7 @@ contract LightVesting is LightStorageIntegration {
     event VestingCreate(bytes32 indexed key, Vesting vesting, uint256 nonce);
     event VestingClaim(bytes32 indexed key, Vesting vesting, uint256 unlocked);
 
+    /// @notice Constructor to initialize the contract with a Config struct
     constructor(Config memory config) {
         require(config.admin == msg.sender, NotAdmin(msg.sender, config.admin));
         require(config.fee <= MAX_FEE, FeeOverMax(config.fee, MAX_FEE));
@@ -94,24 +111,28 @@ contract LightVesting is LightStorageIntegration {
         emit Configuration(config, true);
     }
 
+    /// @notice Updates the vesting creation rules
     function configurate(Config memory updated) public {
         Config memory config = getConfig(CONFIG_KEY);
 
         require(config.admin == msg.sender, NotAdmin(msg.sender, config.admin));
         require(config.token == updated.token, TokenMismatch(updated.token, config.token));
-        require(updated.fee <= MAX_FEE, FeeOverMax(config.fee, MAX_FEE));
-        require(updated.maxCliffPercent <= DENOM, PercentOverMax(config.maxCliffPercent, DENOM));
+        require(updated.fee <= MAX_FEE, FeeOverMax(updated.fee, MAX_FEE));
+        require(updated.maxCliffPercent <= DENOM, PercentOverMax(updated.maxCliffPercent, DENOM));
 
         _setConfig(CONFIG_KEY, updated);
 
         emit Configuration(config, config.admin != updated.admin);
     }
 
+    /// @notice EOA `configurate` function endpoint
     function configurate(Config memory updated, Config memory config) external {
         loadConfig(CONFIG_KEY, config);
         configurate(updated);
     }
 
+    /// @notice Creates a new vesting schedule
+    /// @return key The key associated with the newly created vesting schedule
     function create(
         address beneficiary,
         uint256 nonce,
@@ -140,6 +161,7 @@ contract LightVesting is LightStorageIntegration {
         emit VestingCreate(key, vesting, nonce);
     }
 
+    /// @notice EOA `create` function endpoint
     function create(
         address beneficiary,
         uint256 nonce,
@@ -153,6 +175,7 @@ contract LightVesting is LightStorageIntegration {
         return create(beneficiary, nonce, amount, start, duration, cliff);
     }
 
+    /// @notice Calculates the total amount of tokens vested based on the current time
     function _calcTotalVested(
         uint256 start,
         uint256 cliff,
@@ -168,20 +191,25 @@ contract LightVesting is LightStorageIntegration {
         }
     }
 
+    /// @notice Calculates the amount of tokens that can be withdrawn at the moment
     function _calcWithdrawable(Vesting memory vesting) internal view returns (uint256) {
         uint256 vestedAmount = _calcTotalVested(vesting.start, vesting.cliff, vesting.duration, vesting.amount);
         return vestedAmount - vesting.claimed;
     }
 
+    /// @notice Returns the amount of tokens that can be withdrawn by the beneficiary at the moment
+    /// @return The amount of tokens that can be withdrawn
     function withdrawable(bytes32 key) public view returns (uint256) {
         return _calcWithdrawable(getVesting(key));
     }
 
+    /// @notice EOA `withdrawable` function endpoint
     function withdrawable(bytes32 key, Vesting memory vesting) external returns (uint256) {
         loadVesting(key, vesting);
         return withdrawable(key);
     }
 
+    /// @notice Allows the beneficiary to withdraw vested tokens
     function withdraw(bytes32 key) public {
         Vesting memory vesting = getVesting(key);
         require(vesting.user == msg.sender, NotBeneficiary(msg.sender, vesting.user));
@@ -198,6 +226,7 @@ contract LightVesting is LightStorageIntegration {
         emit VestingClaim(key, vesting, unlocked);
     }
 
+    /// @notice EOA `withdraw` function endpoint
     function withdraw(bytes32 key, Config memory config, Vesting memory vesting) external {
         loadConfig(CONFIG_KEY, config);
         loadVesting(key, vesting);
