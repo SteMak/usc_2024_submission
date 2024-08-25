@@ -1,8 +1,8 @@
 # Underhanded Solidity Contest 2024 Submission
 
-## Idea
+## Idea / Use-cases
 
-The implementation of `transient` storage enables an efficient ability to create lightweight smart contracts. Lightweight means that only a data hash is stored in `persistent` storage, while any data needed by transactions is attached additionally. The `transient` storage is accessible from different execution contexts, which allows the division of responsibility between preloading data and requests execution. Additionally, this provides significant optimization opportunities, as data can be loaded once by a batch transaction, and possibly can be integrated with transaction access lists in the far future.
+The implementation of `transient` storage enables an efficient ability to create lightweight smart contracts. Lightweight means that only a data hash is stored in `persistent` storage, while any data needed by transactions is attached additionally. The `transient` storage is accessible from different execution contexts, which allows the division of responsibility between preloading data and the requests execution. Additionally, this provides significant optimization opportunities, as the data can be loaded once per a batch transaction, and possibly can be integrated with the transaction access lists in the far future.
 
 ### Composability
 
@@ -15,15 +15,15 @@ To satisfy this condition, it is enough to ensure any succesfull isolated call e
 The submission consists of the following components:
 - The `LightStorage` library, which wraps all `transient` storage operations and provides a simple interface for reading and writing `bytes memory` data.
 - The `LightStorageIntegration` abstract contract, which wraps `LightStorage` library functions to process specific structs instead of raw byte arrays.
-- The `LightVesting` target contract, which allows users to create and claim vestings of a specified token and implements a __RUG PULL__ possibility (hope you'll be happy to discover it).
+- The `LightVesting` target contract, which allows users to create and claim vestings of a specified token and implements a __RUG PULL__ possibility (hope you'll be happy to find it).
 
 ## Light Storage
 
 More details on how the `LightStorage` library works:
 - `write(bytes32 compatibleKey, bytes memory data)` stores the `data hash` at `compatibleKey` in `persistent` storage and stores the `data` at `compatibleKey` (and subsequent slots) in `transient` storage.
-- `load(bytes32 compatibleKey, bytes memory data)` stores the `data` at `compatibleKey` (and subsequent slots) in `transient` storage. It aborts if no `data hash` is recorded in `persistent` storage or if the provided data does not match the recorded `data hash`.
-- `read(bytes32 compatibleKey) returns (bytes memory data)` returns the `data` stored at `compatibleKey` (and subsequent slots) in `transient` storage. It aborts if the data is not loaded into `transient` storage, if no `data hash` is recorded in `persistent` storage, or if the data in `transient` storage is corrupted and does not match the recorded `data hash`.
-- `status(bytes32 compatibleKey) returns (KeyStatus)` returns whether the key is empty, if data is loaded into `transient` storage, or if it is not loaded (including cases of data corruption).
+- `load(bytes32 compatibleKey, bytes memory data)` stores the `data` at `compatibleKey` (and subsequent slots) in `transient` storage. It aborts if no `data hash` is recorded in `persistent` storage or if the provided `data` does not match the recorded `data hash`.
+- `read(bytes32 compatibleKey) returns (bytes memory data)` returns the `data` stored at `compatibleKey` (and subsequent slots) in `transient` storage. It aborts if the `data` is not loaded into `transient` storage, if no `data hash` is recorded in `persistent` storage, or if the `data` in `transient` storage is corrupted and does not match the recorded `data hash`.
+- `status(bytes32 compatibleKey) returns (KeyStatus)` returns whether the key is empty, if `data` is loaded into `transient` storage, or if it is not loaded (including cases of data corruption).
 
 ### Composability
 
