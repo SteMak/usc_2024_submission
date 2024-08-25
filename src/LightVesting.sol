@@ -27,8 +27,8 @@ struct Vesting {
 abstract contract LightStorageIntegration {
     using LightStorage for bytes32;
 
-    bytes32 internal constant CONFIG_KEY = bytes32(uint256(keccak256("compatibleKey.vesting.config")) - 1);
-    bytes32 internal constant VESTING_KEY = bytes32(uint256(keccak256("compatibleKey.vesting.vestingPrefix")) - 1);
+    bytes32 public constant CONFIG_KEY = bytes32(uint256(keccak256("compatibleKey.vesting.config")) - 1);
+    bytes32 public constant VESTING_KEY = bytes32(uint256(keccak256("compatibleKey.vesting.vestingPrefix")) - 1);
 
     function keyStatus(bytes32 key) public view returns (KeyStatus) {
         return key.status();
