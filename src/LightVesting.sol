@@ -65,27 +65,27 @@ contract LightVesting is LightStorageIntegration {
     uint256 public constant DENOM = 100000; // 100%
     uint32 public constant MAX_FEE = 1000; // 1%
 
-    error NotAdmin();
+    error NotAdmin(address caller, address admin);
 
-    error TokenMismatch();
-    error FeeOverMax();
-    error PercentOverMax();
+    error TokenMismatch(IERC20 token, IERC20 configured);
+    error FeeOverMax(uint256 fee, uint256 max);
+    error PercentOverMax(uint256 percent, uint256 max);
 
-    error CliffOverMax();
-    error AmountOverMax();
-    error DurationOverMax();
+    error CliffOverMax(uint256 cliff, uint256 max);
+    error AmountOverMax(uint256 amount, uint256 max);
+    error DurationOverMax(uint256 duration, uint256 max);
 
-    error VestingAlreadyExist();
-    error NotBeneficiary();
+    error VestingAlreadyExist(bytes32 key);
+    error NotBeneficiary(address caller, address beneficiary);
 
     event Configuration(Config config, bool adminChanged);
     event VestingCreate(bytes32 indexed key, Vesting vesting, uint256 nonce);
     event VestingClaim(bytes32 indexed key, Vesting vesting, uint256 unlocked);
 
     constructor(Config memory config) {
-        require(config.admin == msg.sender, NotAdmin());
-        require(config.fee <= MAX_FEE, FeeOverMax());
-        require(config.maxCliffPercent <= DENOM, PercentOverMax());
+        require(config.admin == msg.sender, NotAdmin(msg.sender, config.admin));
+        require(config.fee <= MAX_FEE, FeeOverMax(config.fee, MAX_FEE));
+        require(config.maxCliffPercent <= DENOM, PercentOverMax(config.maxCliffPercent, DENOM));
 
         _setConfig(CONFIG_KEY, config);
 
@@ -95,10 +95,10 @@ contract LightVesting is LightStorageIntegration {
     function configurate(Config memory updated) public {
         Config memory config = getConfig(CONFIG_KEY);
 
-        require(config.admin == msg.sender, NotAdmin());
-        require(config.token == updated.token, TokenMismatch());
-        require(updated.fee <= MAX_FEE, FeeOverMax());
-        require(updated.maxCliffPercent <= DENOM, PercentOverMax());
+        require(config.admin == msg.sender, NotAdmin(msg.sender, config.admin));
+        require(config.token == updated.token, TokenMismatch(updated.token, config.token));
+        require(updated.fee <= MAX_FEE, FeeOverMax(config.fee, MAX_FEE));
+        require(updated.maxCliffPercent <= DENOM, PercentOverMax(config.maxCliffPercent, DENOM));
 
         _setConfig(CONFIG_KEY, updated);
 
@@ -119,13 +119,14 @@ contract LightVesting is LightStorageIntegration {
         uint32 cliff
     ) public returns (bytes32 key) {
         key = keccak256(abi.encode(VESTING_KEY, beneficiary, msg.sender, nonce));
-        require((keyStatus(key) == KeyStatus.Empty), VestingAlreadyExist());
+        require((keyStatus(key) == KeyStatus.Empty), VestingAlreadyExist(key));
 
         Config memory config = getConfig(CONFIG_KEY);
 
-        require((duration * config.maxCliffPercent) / DENOM >= cliff, CliffOverMax());
-        require(config.maxAmount >= amount, AmountOverMax());
-        require(config.maxDuration >= duration, DurationOverMax());
+        uint256 maxCliff = (duration * config.maxCliffPercent) / DENOM;
+        require(maxCliff >= cliff, CliffOverMax(cliff, maxCliff));
+        require(config.maxAmount >= amount, AmountOverMax(amount, config.maxAmount));
+        require(config.maxDuration >= duration, DurationOverMax(duration, config.maxDuration));
 
         config.token.safeTransferFrom(msg.sender, address(this), amount);
 
@@ -179,7 +180,7 @@ contract LightVesting is LightStorageIntegration {
 
     function withdraw(bytes32 key) public {
         Vesting memory vesting = getVesting(key);
-        require(vesting.user == msg.sender, NotBeneficiary());
+        require(vesting.user == msg.sender, NotBeneficiary(msg.sender, vesting.user));
 
         Config memory config = getConfig(CONFIG_KEY);
 
