@@ -11,12 +11,12 @@ enum KeyStatus {
 /// @dev Combined storage layout
 ///
 /// Persistent Storage
-/// [compatibleKey] keccak256(data)
+/// [combinedKey] keccak256(data)
 ///
 /// Transient Storage
-/// [compatibleKey]        data.length
-/// [compatibleKey + k]    data[(k - 1) * 0x20 : k * 0x20]    (0 < k <= data.length / 0x20)
-/// [compatibleKey + data.length / 0x20 + 1] 00..00 concat data[data.length / 0x20 * 0x20 : data.length]
+/// [combinedKey]        data.length
+/// [combinedKey + k]    data[(k - 1) * 0x20 : k * 0x20]    (0 < k <= data.length / 0x20)
+/// [combinedKey + data.length / 0x20 + 1] 00..00 concat data[data.length / 0x20 * 0x20 : data.length]
 
 /// @title LightStorage Library
 /// @notice Combined storage abstraction
@@ -27,9 +27,9 @@ enum KeyStatus {
 library LightStorage {
     error DataMismatchHash(bytes32 dataHash, bytes32 persistentHash);
     error DataNotLoaded(bytes32 persistentHash);
-    error UnknownKey(bytes32 compatibleKey);
+    error UnknownKey(bytes32 combinedKey);
 
-    event Write(bytes32 indexed compatibleKey, bytes data);
+    event Write(bytes32 indexed combinedKey, bytes data);
 
     /// @dev Writes a 32-byte value to `persistent` storage
     function _writeS(bytes32 key, bytes32 value) private {
@@ -107,11 +107,11 @@ library LightStorage {
     /// @notice Check the status of combined storage at the key
     /// @dev HashOnly response may indicate both empty and corrupted `transient` storage value
     /// @return The status of the combined storage (Empty, HashOnly, or Loaded)
-    function status(bytes32 compatibleKey) internal view returns (KeyStatus) {
-        bytes32 persistentHash = _readS(compatibleKey);
+    function status(bytes32 combinedKey) internal view returns (KeyStatus) {
+        bytes32 persistentHash = _readS(combinedKey);
         if (persistentHash == 0) return KeyStatus.Empty;
 
-        bytes memory data = _readT(compatibleKey);
+        bytes memory data = _readT(combinedKey);
 
         bytes32 dataHash = keccak256(data);
         if (persistentHash == dataHash) return KeyStatus.Loaded;
@@ -122,25 +122,25 @@ library LightStorage {
     /// @notice Preload data to combined storage
     /// @dev Loads data into `transient` storage, ensuring it matches the hash in `persistent` storage
     /// @dev Reverts if the `persistent` storage is empty or if the data does not match the hash
-    function load(bytes32 compatibleKey, bytes memory data) internal {
-        bytes32 persistentHash = _readS(compatibleKey);
-        require(persistentHash != 0, UnknownKey(compatibleKey));
+    function load(bytes32 combinedKey, bytes memory data) internal {
+        bytes32 persistentHash = _readS(combinedKey);
+        require(persistentHash != 0, UnknownKey(combinedKey));
 
         bytes32 dataHash = keccak256(data);
         require(persistentHash == dataHash, DataMismatchHash(dataHash, persistentHash));
 
-        _writeT(compatibleKey, data);
+        _writeT(combinedKey, data);
     }
 
     /// @notice Get data from combined storage
     /// @dev Reads data from `transient` storage, ensuring it is loaded
     /// @dev Reverts if the `persistent` storage is empty or if the data is not loaded or is corrupted
     /// @return data The data stored in combined storage at the key
-    function read(bytes32 compatibleKey) internal view returns (bytes memory data) {
-        bytes32 persistentHash = _readS(compatibleKey);
-        require(persistentHash != 0, UnknownKey(compatibleKey));
+    function read(bytes32 combinedKey) internal view returns (bytes memory data) {
+        bytes32 persistentHash = _readS(combinedKey);
+        require(persistentHash != 0, UnknownKey(combinedKey));
 
-        data = _readT(compatibleKey);
+        data = _readT(combinedKey);
 
         bytes32 dataHash = keccak256(data);
         require(persistentHash == dataHash, DataNotLoaded(persistentHash));
@@ -148,12 +148,12 @@ library LightStorage {
 
     /// @notice Write data to combined storage
     /// @dev Writes data to both `persistent` and `transient` storage
-    function write(bytes32 compatibleKey, bytes memory data) internal {
+    function write(bytes32 combinedKey, bytes memory data) internal {
         bytes32 dataHash = keccak256(data);
 
-        _writeS(compatibleKey, dataHash);
-        _writeT(compatibleKey, data);
+        _writeS(combinedKey, dataHash);
+        _writeT(combinedKey, data);
 
-        emit Write(compatibleKey, data);
+        emit Write(combinedKey, data);
     }
 }

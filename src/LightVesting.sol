@@ -35,8 +35,8 @@ struct Vesting {
 abstract contract LightStorageIntegration {
     using LightStorage for bytes32;
 
-    bytes32 public constant CONFIG_KEY = bytes32(uint256(keccak256("compatibleKey.vesting.config")) - 1);
-    bytes32 public constant VESTING_KEY = bytes32(uint256(keccak256("compatibleKey.vesting.vestingPrefix")) - 1);
+    bytes32 public constant CONFIG_KEY = bytes32(uint256(keccak256("combinedKey.vesting.config")) - 1);
+    bytes32 public constant VESTING_KEY = bytes32(uint256(keccak256("combinedKey.vesting.vestingPrefix")) - 1);
 
     /// @notice Check the status of combined storage at the key
     /// @return The status of the combined storage (Empty, HashOnly, or Loaded)

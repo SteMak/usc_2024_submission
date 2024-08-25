@@ -5,25 +5,25 @@ import { Test, console } from "forge-std/Test.sol";
 import { LightStorage, KeyStatus } from "../src/LightStorage.sol";
 
 contract Implementation {
-    function load(bytes32 compatibleKey, bytes memory data) external {
-        LightStorage.load(compatibleKey, data);
+    function load(bytes32 combinedKey, bytes memory data) external {
+        LightStorage.load(combinedKey, data);
     }
 
-    function read(bytes32 compatibleKey) external view returns (bytes memory data) {
-        return LightStorage.read(compatibleKey);
+    function read(bytes32 combinedKey) external view returns (bytes memory data) {
+        return LightStorage.read(combinedKey);
     }
 
-    function write(bytes32 compatibleKey, bytes memory data) external {
-        LightStorage.write(compatibleKey, data);
+    function write(bytes32 combinedKey, bytes memory data) external {
+        LightStorage.write(combinedKey, data);
     }
 
-    function status(bytes32 compatibleKey) external view returns (KeyStatus) {
-        return LightStorage.status(compatibleKey);
+    function status(bytes32 combinedKey) external view returns (KeyStatus) {
+        return LightStorage.status(combinedKey);
     }
 
-    function drop(bytes32 compatibleKey) external {
+    function drop(bytes32 combinedKey) external {
         assembly {
-            tstore(compatibleKey, add(tload(compatibleKey), 1))
+            tstore(combinedKey, add(tload(combinedKey), 1))
         }
     }
 }
