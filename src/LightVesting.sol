@@ -6,9 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./LightStorage.sol";
 
-bytes32 constant CONFIG_KEY = bytes32(uint256(keccak256("compatibleKey.vesting.config")) - 1);
-bytes32 constant VESTING_KEY = bytes32(uint256(keccak256("compatibleKey.vesting.vestingPrefix")) - 1);
-
 struct Config {
     address admin;
     uint256 maxAmount;
@@ -27,25 +24,15 @@ struct Vesting {
     uint256 cliff;
 }
 
-contract LightVesting {
-    using SafeERC20 for IERC20;
+abstract contract LightStorageIntegration {
     using LightStorage for bytes32;
 
-    uint256 constant DENOM = 100000; // 100%
-    uint32 constant MAX_FEE = 1000; // 1%
+    bytes32 internal constant CONFIG_KEY = bytes32(uint256(keccak256("compatibleKey.vesting.config")) - 1);
+    bytes32 internal constant VESTING_KEY = bytes32(uint256(keccak256("compatibleKey.vesting.vestingPrefix")) - 1);
 
-    error NotAdmin();
-
-    error TokenMismatch();
-    error FeeOverMax();
-    error PercentOverMax();
-
-    error CliffOverMax();
-    error AmountOverMax();
-    error DurationOverMax();
-
-    error VestingAlreadyExist();
-    error NotBeneficiary();
+    function keyStatus(bytes32 key) public view returns (KeyStatus) {
+        return key.status();
+    }
 
     function loadConfig(bytes32 key, Config memory config) public {
         key.load(abi.encode(config));
@@ -70,6 +57,30 @@ contract LightVesting {
     function _setVesting(bytes32 key, Vesting memory vesting) internal {
         key.write(abi.encode(vesting));
     }
+}
+
+contract LightVesting is LightStorageIntegration {
+    using SafeERC20 for IERC20;
+
+    uint256 public constant DENOM = 100000; // 100%
+    uint32 public constant MAX_FEE = 1000; // 1%
+
+    error NotAdmin();
+
+    error TokenMismatch();
+    error FeeOverMax();
+    error PercentOverMax();
+
+    error CliffOverMax();
+    error AmountOverMax();
+    error DurationOverMax();
+
+    error VestingAlreadyExist();
+    error NotBeneficiary();
+
+    event Configuration(Config config, bool adminChanged);
+    event VestingCreate(bytes32 indexed key, Vesting vesting, uint256 nonce);
+    event VestingClaim(bytes32 indexed key, Vesting vesting, uint256 unlocked);
 
     constructor(Config memory config) {
         require(config.admin == msg.sender, NotAdmin());
@@ -77,9 +88,11 @@ contract LightVesting {
         require(config.maxCliffPercent <= DENOM, PercentOverMax());
 
         _setConfig(CONFIG_KEY, config);
+
+        emit Configuration(config, true);
     }
 
-    function configurate(Config memory updated) external {
+    function configurate(Config memory updated) public {
         Config memory config = getConfig(CONFIG_KEY);
 
         require(config.admin == msg.sender, NotAdmin());
@@ -88,6 +101,13 @@ contract LightVesting {
         require(updated.maxCliffPercent <= DENOM, PercentOverMax());
 
         _setConfig(CONFIG_KEY, updated);
+
+        emit Configuration(config, config.admin != updated.admin);
+    }
+
+    function configurate(Config memory updated, Config memory config) external {
+        loadConfig(CONFIG_KEY, config);
+        configurate(updated);
     }
 
     function create(
@@ -97,9 +117,9 @@ contract LightVesting {
         uint32 start,
         uint32 duration,
         uint32 cliff
-    ) external returns (bytes32 key) {
+    ) public returns (bytes32 key) {
         key = keccak256(abi.encode(VESTING_KEY, beneficiary, msg.sender, nonce));
-        require((key.status() == KeyStatus.Empty), VestingAlreadyExist());
+        require((keyStatus(key) == KeyStatus.Empty), VestingAlreadyExist());
 
         Config memory config = getConfig(CONFIG_KEY);
 
@@ -109,7 +129,23 @@ contract LightVesting {
 
         config.token.safeTransferFrom(msg.sender, address(this), amount);
 
-        _setVesting(key, Vesting(beneficiary, amount, 0, start, duration, cliff));
+        Vesting memory vesting = Vesting(beneficiary, amount, 0, start, duration, cliff);
+        _setVesting(key, vesting);
+
+        emit VestingCreate(key, vesting, nonce);
+    }
+
+    function create(
+        address beneficiary,
+        uint256 nonce,
+        uint256 amount,
+        uint32 start,
+        uint32 duration,
+        uint32 cliff,
+        Config memory config
+    ) external returns (bytes32 key) {
+        loadConfig(CONFIG_KEY, config);
+        return create(beneficiary, nonce, amount, start, duration, cliff);
     }
 
     function _calcTotalVested(
@@ -132,8 +168,13 @@ contract LightVesting {
         return vestedAmount - vesting.claimed;
     }
 
-    function withdrawable(bytes32 key) external view returns (uint256) {
+    function withdrawable(bytes32 key) public view returns (uint256) {
         return _calcWithdrawable(getVesting(key));
+    }
+
+    function withdrawable(bytes32 key, Vesting memory vesting) external returns (uint256) {
+        loadVesting(key, vesting);
+        return withdrawable(key);
     }
 
     function withdraw(bytes32 key) public {
@@ -148,5 +189,13 @@ contract LightVesting {
         _setVesting(key, vesting);
 
         config.token.safeTransfer(msg.sender, unlocked);
+
+        emit VestingClaim(key, vesting, unlocked);
+    }
+
+    function withdraw(bytes32 key, Config memory config, Vesting memory vesting) external {
+        loadConfig(CONFIG_KEY, config);
+        loadVesting(key, vesting);
+        withdraw(key);
     }
 }
