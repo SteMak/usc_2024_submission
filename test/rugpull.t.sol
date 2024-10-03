@@ -8,7 +8,7 @@ import { Test, console } from "forge-std/Test.sol";
 import { LightVesting, Config } from "../src/LightVesting.sol";
 
 contract MockERC20 is ERC20 {
-    constructor(string memory _name, string memory _symbol) ERC20(_name, _symbol) {}
+    constructor(string memory _name, string memory _symbol) ERC20(_name, _symbol) { }
 
     function mint(uint256 amount) public {
         _mint(msg.sender, amount);

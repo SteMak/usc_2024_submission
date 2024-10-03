@@ -8,7 +8,7 @@ import { Test, console } from "forge-std/Test.sol";
 import { LightVesting, Config } from "../src/LightVesting.sol";
 
 contract MockERC20 is ERC20 {
-    constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) { }
 
     function mint(address to, uint256 amount) public {
         _mint(to, amount);
@@ -31,9 +31,7 @@ contract VestingTest is Test {
 
     function test_config() public {
         vm.expectRevert();
-        vesting.configurate(
-            Config(address(this), 10 ** 9 * 10 ** 18, 5 * 52 weeks, 70000, 100, IERC20(address(token)))
-        );
+        vesting.configurate(Config(address(this), 10 ** 9 * 10 ** 18, 5 * 52 weeks, 70000, 100, IERC20(address(token))));
 
         vesting.configurate(
             Config(address(this), 10 ** 9 * 10 ** 18, 5 * 52 weeks, 70000, 100, IERC20(address(token))),
@@ -47,9 +45,7 @@ contract VestingTest is Test {
 
         vm.prank(userA);
         vm.expectRevert();
-        vesting.configurate(
-            Config(address(this), 10 ** 9 * 10 ** 18, 5 * 52 weeks, 70000, 100, IERC20(address(token)))
-        );
+        vesting.configurate(Config(address(this), 10 ** 9 * 10 ** 18, 5 * 52 weeks, 70000, 100, IERC20(address(token))));
 
         vm.expectRevert();
         vesting.configurate(Config(address(this), 10 ** 9 * 10 ** 18, 5 * 52 weeks, 70000, 100, IERC20(userB)));
@@ -75,8 +71,8 @@ contract VestingTest is Test {
 
     function test_basicFlow() public {
         uint256 amount = 100000000;
-        token.mint(address(this), type(uint).max);
-        token.approve(address(vesting), type(uint).max);
+        token.mint(address(this), type(uint256).max);
+        token.approve(address(vesting), type(uint256).max);
 
         bytes32 key = vesting.create(
             userA,

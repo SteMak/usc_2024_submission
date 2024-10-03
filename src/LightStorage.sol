@@ -56,14 +56,10 @@ library LightStorage {
         }
 
         assembly {
-            for {
-
-            } iszero(eq(key, lastKey)) {
+            for { } iszero(eq(key, lastKey)) {
                 data := add(data, 0x20)
                 key := add(key, 0x01)
-            } {
-                tstore(key, mload(data))
-            }
+            } { tstore(key, mload(data)) }
             tstore(key, shr(lastShift, mload(data)))
         }
     }
@@ -92,14 +88,10 @@ library LightStorage {
 
         assembly {
             let i := 0x20
-            for {
-
-            } iszero(eq(key, lastKey)) {
+            for { } iszero(eq(key, lastKey)) {
                 i := add(i, 0x20)
                 key := add(key, 0x01)
-            } {
-                mstore(add(data, i), tload(key))
-            }
+            } { mstore(add(data, i), tload(key)) }
             mstore(add(data, i), shl(lastShift, tload(key)))
         }
     }

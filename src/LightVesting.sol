@@ -137,14 +137,10 @@ contract LightVesting is LightStorageIntegration {
 
     /// @notice Create a new vesting schedule
     /// @return key The key associated with the newly created vesting
-    function create(
-        address beneficiary,
-        uint256 nonce,
-        uint256 amount,
-        uint256 start,
-        uint256 duration,
-        uint256 cliff
-    ) public returns (bytes32 key) {
+    function create(address beneficiary, uint256 nonce, uint256 amount, uint256 start, uint256 duration, uint256 cliff)
+        public
+        returns (bytes32 key)
+    {
         key = keccak256(abi.encode(VESTING_KEY, beneficiary, msg.sender, nonce));
         require((keyStatus(key) == KeyStatus.Empty), VestingAlreadyExist(key));
 
@@ -186,12 +182,11 @@ contract LightVesting is LightStorageIntegration {
     }
 
     /// @dev Calculates the total amount of tokens vested based on the current time
-    function _calcTotalVested(
-        uint256 start,
-        uint256 cliff,
-        uint256 duration,
-        uint256 amount
-    ) internal view returns (uint256) {
+    function _calcTotalVested(uint256 start, uint256 cliff, uint256 duration, uint256 amount)
+        internal
+        view
+        returns (uint256)
+    {
         /// @dev In case of misconfiguration `start + duration` may overflow
         if (block.timestamp >= start + duration) {
             return amount;

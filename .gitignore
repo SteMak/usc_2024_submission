@@ -17,3 +17,7 @@ docs/
 report/
 bytecode-coverage/
 lcov.info
+
+# Editor
+.vscode
+.idea

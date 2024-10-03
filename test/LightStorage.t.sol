@@ -37,8 +37,8 @@ contract LightStorageTest is Test {
 
     function test_basicFlow() public {
         bytes32 key = bytes32(0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe);
-        bytes
-            memory data = hex"7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabb";
+        bytes memory data =
+            hex"7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabb";
 
         assertEq(uint8(impl.status(key)), uint8(KeyStatus.Empty));
         vm.expectRevert();
@@ -69,8 +69,8 @@ contract LightStorageTest is Test {
     }
 
     function test_basicFlow(bytes32 key) public {
-        bytes
-            memory data = hex"7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabb";
+        bytes memory data =
+            hex"7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabb";
 
         assertEq(uint8(impl.status(key)), uint8(KeyStatus.Empty));
         vm.expectRevert();
