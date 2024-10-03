@@ -15,7 +15,7 @@ contract MockERC20 is ERC20 {
     }
 }
 
-contract VestingTest is Test {
+contract RugPullTest is Test {
     LightVesting vesting;
     IERC20 token;
     Config config;

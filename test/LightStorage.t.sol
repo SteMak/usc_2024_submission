@@ -35,12 +35,13 @@ contract LightStorageTest is Test {
         impl = new Implementation();
     }
 
-    function test_basicFlow() public {
+    function test_basics() public {
         bytes32 key = bytes32(0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe);
         bytes memory data =
             hex"7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabb";
 
         assertEq(uint8(impl.status(key)), uint8(KeyStatus.Empty));
+
         vm.expectRevert();
         impl.load(key, data);
 
@@ -55,6 +56,7 @@ contract LightStorageTest is Test {
 
         impl.drop(key);
         assertEq(uint8(impl.status(key)), uint8(KeyStatus.HashOnly));
+
         vm.expectRevert();
         impl.read(key);
 
@@ -68,11 +70,11 @@ contract LightStorageTest is Test {
         assertEq(data, retrieved_again);
     }
 
-    function test_basicFlow(bytes32 key) public {
-        bytes memory data =
-            hex"7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabbccddeeff7788aabb";
+    function test_basics_fuzz(bytes32 key, bytes memory data, bytes memory other_data) public {
+        vm.assume(keccak256(other_data) != keccak256(data));
 
         assertEq(uint8(impl.status(key)), uint8(KeyStatus.Empty));
+
         vm.expectRevert();
         impl.load(key, data);
 
@@ -87,46 +89,12 @@ contract LightStorageTest is Test {
 
         impl.drop(key);
         assertEq(uint8(impl.status(key)), uint8(KeyStatus.HashOnly));
-        vm.expectRevert();
-        impl.read(key);
-
-        vm.expectRevert();
-        impl.load(key, hex"7788aabbccddeeff");
-
-        impl.load(key, data);
-        assertEq(uint8(impl.status(key)), uint8(KeyStatus.Loaded));
-
-        bytes memory retrieved_again = impl.read(key);
-        assertEq(data, retrieved_again);
-    }
-
-    function test_basicFlow(bytes32 key, bytes memory data) public {
-        assertEq(uint8(impl.status(key)), uint8(KeyStatus.Empty));
-        vm.expectRevert();
-        impl.load(key, data);
 
         vm.expectRevert();
         impl.read(key);
 
-        impl.write(key, data);
-        assertEq(uint8(impl.status(key)), uint8(KeyStatus.Loaded));
-
-        bytes memory retrieved = impl.read(key);
-        assertEq(data, retrieved);
-
-        impl.drop(key);
-        assertEq(uint8(impl.status(key)), uint8(KeyStatus.HashOnly));
         vm.expectRevert();
-        impl.read(key);
-
-        assembly {
-            mstore(data, add(mload(data), 1))
-        }
-        vm.expectRevert();
-        impl.load(key, data);
-        assembly {
-            mstore(data, sub(mload(data), 1))
-        }
+        impl.load(key, other_data);
 
         impl.load(key, data);
         assertEq(uint8(impl.status(key)), uint8(KeyStatus.Loaded));
